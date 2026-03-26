@@ -1,7 +1,6 @@
 build/obj/Scripts/Skybox/Skybox.o: Scripts/Skybox/Skybox.cpp \
- External/External/stb_image.h Scripts/Skybox/Skybox.h \
- External/External/glad/glad.h External/External/KHR/khrplatform.h \
- External/External/glm/glm.hpp External/External/glm/detail/_fixes.hpp \
+ External/External/stb_image.h External/External/glm/glm.hpp \
+ External/External/glm/detail/_fixes.hpp \
  External/External/glm/detail/setup.hpp \
  External/External/glm/detail/../simd/platform.h \
  External/External/glm/fwd.hpp External/External/glm/detail/qualifier.hpp \
@@ -139,11 +138,23 @@ build/obj/Scripts/Skybox/Skybox.o: Scripts/Skybox/Skybox.cpp \
  External/External/glm/detail/type_half.hpp \
  External/External/glm/detail/type_half.inl \
  External/External/glm/integer.hpp \
- External/External/glm/detail/func_integer.inl
+ External/External/glm/detail/func_integer.inl \
+ External/External/glm/gtc/matrix_transform.hpp \
+ External/External/glm/gtc/../ext/matrix_projection.hpp \
+ External/External/glm/gtc/../ext/../gtc/constants.hpp \
+ External/External/glm/gtc/../ext/../gtc/../ext/scalar_constants.hpp \
+ External/External/glm/gtc/../ext/../gtc/../ext/../detail/setup.hpp \
+ External/External/glm/gtc/../ext/../gtc/../ext/scalar_constants.inl \
+ External/External/glm/gtc/../ext/../gtc/constants.inl \
+ External/External/glm/gtc/../ext/matrix_projection.inl \
+ External/External/glm/gtc/../ext/matrix_clip_space.hpp \
+ External/External/glm/gtc/../ext/matrix_clip_space.inl \
+ External/External/glm/gtc/../ext/matrix_transform.hpp \
+ External/External/glm/gtc/../ext/matrix_transform.inl \
+ External/External/glm/gtc/matrix_transform.inl Scripts/Skybox/Skybox.h \
+ Shaders/Loaders/shader_t.h External/External/glad/glad.h \
+ External/External/KHR/khrplatform.h
 External/External/stb_image.h:
-Scripts/Skybox/Skybox.h:
-External/External/glad/glad.h:
-External/External/KHR/khrplatform.h:
 External/External/glm/glm.hpp:
 External/External/glm/detail/_fixes.hpp:
 External/External/glm/detail/setup.hpp:
@@ -286,3 +297,20 @@ External/External/glm/detail/type_half.hpp:
 External/External/glm/detail/type_half.inl:
 External/External/glm/integer.hpp:
 External/External/glm/detail/func_integer.inl:
+External/External/glm/gtc/matrix_transform.hpp:
+External/External/glm/gtc/../ext/matrix_projection.hpp:
+External/External/glm/gtc/../ext/../gtc/constants.hpp:
+External/External/glm/gtc/../ext/../gtc/../ext/scalar_constants.hpp:
+External/External/glm/gtc/../ext/../gtc/../ext/../detail/setup.hpp:
+External/External/glm/gtc/../ext/../gtc/../ext/scalar_constants.inl:
+External/External/glm/gtc/../ext/../gtc/constants.inl:
+External/External/glm/gtc/../ext/matrix_projection.inl:
+External/External/glm/gtc/../ext/matrix_clip_space.hpp:
+External/External/glm/gtc/../ext/matrix_clip_space.inl:
+External/External/glm/gtc/../ext/matrix_transform.hpp:
+External/External/glm/gtc/../ext/matrix_transform.inl:
+External/External/glm/gtc/matrix_transform.inl:
+Scripts/Skybox/Skybox.h:
+Shaders/Loaders/shader_t.h:
+External/External/glad/glad.h:
+External/External/KHR/khrplatform.h:

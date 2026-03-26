@@ -1,5 +1,6 @@
 #pragma once
 
+#include "shader_t.h"
 #include <glad/glad.h>
 
 
@@ -11,11 +12,15 @@ public:
 
     void Draw() const;
 
-    GLuint GetSkyboxTex() const;
+    void  BakeIrradiance(Shader& irradianceShader);
+    
+    GLuint GetSkyboxTex()     const;
+    GLuint GetIrradianceMap() const;
 
 private:
-    void  GenerateSkybox();
-    void  UploadToGPU();
+    void GenerateSkybox();
+    void SetupIrradianceFBO();
+    void UploadToGPU();
 
     
 private:
@@ -23,4 +28,7 @@ private:
 
     GLuint skyboxVAO;
     GLuint skyboxVBO;
+    
+    unsigned int irradianceMap;
+    unsigned int captureFBO, captureRBO;
 };

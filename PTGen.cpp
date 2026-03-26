@@ -1,6 +1,6 @@
 #include <iostream>
-#include <random>
 
+#include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
 
@@ -103,6 +103,7 @@ int main()
     glEnable(GL_CULL_FACE);  
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_MULTISAMPLE);  
+    glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
 
     
     Camera camera;
@@ -117,15 +118,18 @@ int main()
     // ------------- terrain init -------------
     ComputeShader noiseCalcComp("Shaders/noise.comp");
      
-    Shader terrainShader("Shaders/terrain.vert", "Shaders/terrain.frag");
+    Shader terrainShader("Shaders/terrain.vert", "Shaders/terrain_pbr.frag");
     Terrain terrain(TERRAIN_SIZE);
 
     terrain.SetupNoiseSSBO();
     
     Shader skyboxShader("Shaders/skybox.vert", "Shaders/skybox.frag");
+    Shader irradianceShader("Shaders/irradiance.vert", "Shaders/irradiance.frag");
     Skybox skybox;
-    skyboxShader.Use();
-    skyboxShader.SetInt("skybox", 0);
+    
+    skybox.BakeIrradiance(irradianceShader);
+    
+    glViewport(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
     
     
     // ------------- imgui init -------------
@@ -140,7 +144,18 @@ int main()
     
     // ------------- timing -------------
     float lastTime = (float)glfwGetTime();
-
+    
+    
+    // ------------- pbr lighting -------------
+    float albedo[3] = { 0.61f, 0.46f, 0.33f };
+    float metallic  = 0.0f;
+    float roughness = 0.5f;
+    float ambOcc    = 1.0f;
+    
+    float lightPos[3] = { -0.8f, 200.0f, -0.3f  };
+    float lightCol[3] = { 30.0f, 30.0f, 30.0f };
+    float lightIntensity = 300.0f;
+    float envLightStr    = 1.0f;
     
     // ------------------------------------------
     // ------------- GLFW MAIN LOOP -------------
@@ -187,15 +202,30 @@ int main()
         glMemoryBarrier(GL_ALL_BARRIER_BITS);
 
         terrainShader.Use();
-        terrainShader.SetMat4("Model", model);
-        terrainShader.SetMat4("MVP", proj * view * model);
+        terrainShader.SetMat4("_Model", model);
+        terrainShader.SetMat4("_MVP", proj * view * model);
         terrainShader.SetInt("_TerrainWidth", TERRAIN_SIZE + 1);
-
+        // PBR uniforms
+        terrainShader.SetVec3("_Albedo", glm::vec3(albedo[0], albedo[1],albedo[2]));
+        terrainShader.SetFloat("_Metallic", metallic);
+        terrainShader.SetFloat("_Roughness", roughness);
+        terrainShader.SetFloat("_AO", ambOcc);
+        terrainShader.SetVec3("_LightPos", glm::vec3(lightPos[0], lightPos[1], lightPos[2]));
+        terrainShader.SetVec3("_LightCol", glm::vec3(lightCol[0], lightCol[1], lightCol[2]));
+        terrainShader.SetFloat("_LightIntensity", lightIntensity);
+        terrainShader.SetFloat("_EnvironmentLightStrength", envLightStr);
+        terrainShader.SetVec3("_CamPos", camera.position);
+        // IBL — bind irradiance map to texture unit 1
+        terrainShader.SetInt("_IrradianceMap", 1);
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, skybox.GetIrradianceMap());
+                
         terrain.Draw();
         
         glDepthFunc(GL_LEQUAL);
         skyboxShader.Use();
-
+        skyboxShader.SetInt("skybox", 0);
+        
         view = glm::mat4(glm::mat3(camera.Get_View_Matrix()));
         skyboxShader.SetMat4("view",       view);
         skyboxShader.SetMat4("projection", proj);
@@ -230,7 +260,18 @@ int main()
         changed |= ImGui::SliderFloat("Fog Density", &uiParams.fog_density, 0.00001f, 0.005f);
 
         if (changed) { terrain.SetParams(uiParams); }
+        ImGui::Separator();
 
+        ImGui::Text("Lighting");
+        ImGui::ColorEdit3("Albedo (Colour)",      albedo);
+        ImGui::SliderFloat("Metallic",           &metallic,  0.0f, 1.0f);
+        ImGui::SliderFloat("Roughness",          &roughness, 0.0f, 1.0f);
+        ImGui::SliderFloat("Ambienct Occlusion", &ambOcc,    0.0f, 1.0f);
+        ImGui::SliderFloat3("Light Position", lightPos, -200.0f, 200.0f);
+        ImGui::ColorEdit3("Light Colour",    lightCol);
+        ImGui::SliderFloat("Light Intensity", &lightIntensity, 0.0f, 500.0f);
+        ImGui::SliderFloat("Environment Light Intensity", &envLightStr, 0.0f, 10.0f);
+        
         ImGui::Separator();
 
         ImGui::Text("Camera");

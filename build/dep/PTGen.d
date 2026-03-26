@@ -1,5 +1,6 @@
-build/obj/./PTGen.o: PTGen.cpp External/External/imgui/imgui_impl_glfw.h \
- External/External/imgui/imgui.h External/External/imgui/imconfig.h \
+build/obj/./PTGen.o: PTGen.cpp External/External/imgui/imgui.h \
+ External/External/imgui/imconfig.h \
+ External/External/imgui/imgui_impl_glfw.h \
  External/External/imgui/imgui_impl_opengl3.h \
  External/External/glad/glad.h External/External/KHR/khrplatform.h \
  External/External/GLFW/glfw3.h Shaders/Loaders/shader_c.h \
@@ -144,9 +145,9 @@ build/obj/./PTGen.o: PTGen.cpp External/External/imgui/imgui_impl_glfw.h \
  External/External/glm/detail/func_integer.inl Shaders/Loaders/shader_t.h \
  External/Include/Camera.h Scripts/Terrain/Terrain.h \
  Scripts/Skybox/Skybox.h
-External/External/imgui/imgui_impl_glfw.h:
 External/External/imgui/imgui.h:
 External/External/imgui/imconfig.h:
+External/External/imgui/imgui_impl_glfw.h:
 External/External/imgui/imgui_impl_opengl3.h:
 External/External/glad/glad.h:
 External/External/KHR/khrplatform.h:
