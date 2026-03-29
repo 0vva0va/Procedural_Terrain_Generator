@@ -40,8 +40,8 @@ void Terrain::Generate_Mesh()
             float xpos = x * step - halfSize;
             float zpos = z * step - halfSize;
 
-            float u = static_cast<float>(x) / vertCountPerSide;
-            float v = static_cast<float>(z) / vertCountPerSide;
+            float u = static_cast<float>(x) / static_cast<float>(resolution);
+            float v = static_cast<float>(z) / static_cast<float>(resolution);
 
             vertices.push_back(xpos);   // x
             vertices.push_back(0.0f);   // y 

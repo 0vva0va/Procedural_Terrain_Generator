@@ -8,7 +8,7 @@
 
 struct TerrainParams 
 {
-    int   octaves     = 4;
+    int   octaves     = 8;
     int   seed        = 0;
     float frequency   = 0.01f;
     float amplitude   = 20.0f;
@@ -16,7 +16,7 @@ struct TerrainParams
     float persistence = 0.5f;
     float hydro       = 0.5f;
     float thermal     = 0.5f;
-    float fog_density = 0.0005f;
+    float fogDensity  = 0.0005f;
 };
 
 

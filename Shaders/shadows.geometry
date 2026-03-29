@@ -1,0 +1,28 @@
+#version 450 core
+
+
+layout(triangles)                         in;
+layout(triangle_strip, max_vertices = 18) out;
+
+
+uniform mat4 _LightSpaceMatrices[6];
+
+
+out vec4 gFragPos;
+
+
+void main()
+{
+    for (int face = 0; face < 6; ++face)
+    {
+        gl_Layer = face;
+
+        for (int v = 0; v < 3; ++v)
+        {
+            gFragPos    = gl_in[v].gl_Position;
+            gl_Position = _LightSpaceMatrices[face] * gFragPos;
+            EmitVertex();
+        }
+        EndPrimitive();
+    }
+}
