@@ -12,7 +12,7 @@ uniform float _AO;
 vec3 GrassCol = vec3(0.247, 0.608, 0.043);
 
 // lights
-uniform vec3  _LightPos;
+uniform vec3  _LightDir;
 uniform vec3  _LightCol;
 uniform float _LightIntensity;
 uniform float _EnvironmentLightStrength;
@@ -47,45 +47,45 @@ vec3 ApplyFog(vec3 col, float t)
 //   Samples the depth cubemap in a small neighbourhood of directions and
 //   averages the results for a soft penumbra.
 // ---------------------------------------------------------------------------
-float PointShadow(vec3 fragWorldPos)
-{
-    vec3  fragToLight  = fragWorldPos - _LightPos;
-    float currentDepth = length(fragToLight);
+// float PointShadow(vec3 fragWorldPos)
+// {
+//     vec3  fragToLight  = fragWorldPos - _LightPos;
+//     float currentDepth = length(fragToLight);
     
-    vec3  L      = normalize(-fragToLight);
-    float NdotL  = max(dot(normalize(FS_Normal), L), 0.0);
-    float bias   = mix(8.0, 0.5, NdotL);  
-    bias        *= (currentDepth / _FarPlane);  
-    bias         = max(bias, 0.1);           
+//     vec3  L      = normalize(-fragToLight);
+//     float NdotL  = max(dot(normalize(FS_Normal), L), 0.0);
+//     float bias   = mix(8.0, 0.5, NdotL);  
+//     bias        *= (currentDepth / _FarPlane);  
+//     bias         = max(bias, 0.1);           
 
-    vec3 sampleOffsets[20] = vec3[](
-        vec3( 1,  1,  1), vec3( 1, -1,  1), vec3(-1, -1,  1), vec3(-1,  1,  1),
-        vec3( 1,  1, -1), vec3( 1, -1, -1), vec3(-1, -1, -1), vec3(-1,  1, -1),
-        vec3( 1,  1,  0), vec3( 1, -1,  0), vec3(-1, -1,  0), vec3(-1,  1,  0),
-        vec3( 1,  0,  1), vec3(-1,  0,  1), vec3( 1,  0, -1), vec3(-1,  0, -1),
-        vec3( 0,  1,  1), vec3( 0, -1,  1), vec3( 0, -1, -1), vec3( 0,  1, -1)
-    );
+//     vec3 sampleOffsets[20] = vec3[](
+//         vec3( 1,  1,  1), vec3( 1, -1,  1), vec3(-1, -1,  1), vec3(-1,  1,  1),
+//         vec3( 1,  1, -1), vec3( 1, -1, -1), vec3(-1, -1, -1), vec3(-1,  1, -1),
+//         vec3( 1,  1,  0), vec3( 1, -1,  0), vec3(-1, -1,  0), vec3(-1,  1,  0),
+//         vec3( 1,  0,  1), vec3(-1,  0,  1), vec3( 1,  0, -1), vec3(-1,  0, -1),
+//         vec3( 0,  1,  1), vec3( 0, -1,  1), vec3( 0, -1, -1), vec3( 0,  1, -1)
+//     );
 
-    float viewDist   = length(_CamPos - fragWorldPos);
-    float diskRadius = mix(0.05, 0.3, viewDist / _FarPlane);
+//     float viewDist   = length(_CamPos - fragWorldPos);
+//     float diskRadius = mix(0.05, 0.3, viewDist / _FarPlane);
     
-    // Rotate PCF disc by a per-fragment angle
-    float angle = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453) * 2.0 * PI;
-    mat2 rot = mat2(cos(angle), -sin(angle), sin(angle), cos(angle));
+//     // Rotate PCF disc by a per-fragment angle
+//     float angle = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453) * 2.0 * PI;
+//     mat2 rot = mat2(cos(angle), -sin(angle), sin(angle), cos(angle));
 
-    float shadow = 0.0;
-    for (int i = 0; i < 20; ++i)
-    {
-        vec3 offset = vec3(sampleOffsets[i].xy * rot, sampleOffsets[i].z);
-        float closestDepth = texture(_ShadowMap, fragToLight + offset * diskRadius).r;
-        closestDepth *= _FarPlane;
+//     float shadow = 0.0;
+//     for (int i = 0; i < 20; ++i)
+//     {
+//         vec3 offset = vec3(sampleOffsets[i].xy * rot, sampleOffsets[i].z);
+//         float closestDepth = texture(_ShadowMap, fragToLight + offset * diskRadius).r;
+//         closestDepth *= _FarPlane;
 
-        if (currentDepth - bias > closestDepth)
-            shadow += 1.0;
-    }
-    float shadowFade = 1.0 - smoothstep(0.7 * _FarPlane, _FarPlane, currentDepth);
-    return (shadow / 20.0) * shadowFade;
-}
+//         if (currentDepth - bias > closestDepth)
+//             shadow += 1.0;
+//     }
+//     float shadowFade = 1.0 - smoothstep(0.7 * _FarPlane, _FarPlane, currentDepth);
+//     return (shadow / 20.0) * shadowFade;
+// }
 
 
 // ---------------------------------------------------------------------------
@@ -155,11 +155,12 @@ void main()
     vec3 F0 = mix(vec3(0.04), _Albedo, _Metallic);
            
     // ---- direct lighting (single point light) ----
-    vec3  L           = normalize(_LightPos);
+    vec3  L           = normalize(-_LightDir);
     vec3  H           = normalize(V + L);
-    float dist        = length(_LightPos - FS_WorldPos);
-    float attenuation = 1.0 / (dist * dist);
-    vec3  radiance    = _LightCol * attenuation * _LightIntensity;
+    // float dist        = length(_LightPos - FS_WorldPos);
+    // float attenuation = 1.0 / (dist * dist);
+    // vec3  radiance    = _LightCol * attenuation * _LightIntensity;
+    vec3  radiance = _LightCol * _LightIntensity;
 
     float NDF = DistributionGGX(N, H, _Roughness);
     float G   = GeometrySmith(N, V, L, _Roughness);
@@ -189,11 +190,11 @@ void main()
     vec3 ambient = (kD_amb * diffuse) * _AO;
          
     // ---- shadow ----
-    float shadow = PointShadow(FS_WorldPos);   
+    //float shadow = PointShadow(FS_WorldPos);   
     
-    ambient *= (1.0 - shadow * 0.2);
+    //ambient *= (1.0 - shadow * 0.2);
 
-    vec3 color = ambient + Lo * (1.0 - shadow);
+    vec3 color = ambient + Lo; //* (1.0 - shadow);
          color = ApplyFog(color, length(_CamPos - FS_WorldPos));
          
          color = ACESFilm(color);

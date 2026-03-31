@@ -26,8 +26,8 @@
 
 #define SHADOW_MAP_RES 4096
 
-constexpr int threadsX = (TERRAIN_SIZE / 8) + 1;
-constexpr int threadsY = (TERRAIN_SIZE / 8) + 1;
+constexpr int threadsX = (TERRAIN_SIZE*2 / 8) + 1;
+constexpr int threadsY = (TERRAIN_SIZE*2 / 8) + 1;
 
 const float padding   = 10.0f;
 static bool wireframe = false;
@@ -93,7 +93,7 @@ void RenderScene(
     // ------------- noise compute -------------
     noiseComp.Use();
     terrain.BindSSBOBuffers();
-    noiseComp.SetInt  ("_TerrainSize",       TERRAIN_SIZE + 1);
+    noiseComp.SetInt  ("_TerrainSize",       TERRAIN_SIZE*2 + 1);
     noiseComp.SetInt  ("u_octaves",          p.octaves);
     noiseComp.SetInt  ("u_seed",             p.seed);
     noiseComp.SetFloat("u_frequency",        p.frequency);
@@ -173,8 +173,8 @@ int main()
     // ------------- terrain + skybox init -------------
     ComputeShader noiseCalcComp("Shaders/noise.comp");
 
-    Shader terrainShader    ("Shaders/terrain2.vert",     "Shaders/terrain2.frag");
-    Shader simpleDepthShader("Shaders/shadows2.vert",     "Shaders/shadows2.frag", "Shaders/shadows.geometry");
+    Shader terrainShader    ("Shaders/terrain.vert",     "Shaders/terrain.frag");
+    Shader simpleDepthShader("Shaders/shadows.vert",     "Shaders/shadows.frag", "Shaders/shadows.geometry");
     Shader skyboxShader     ("Shaders/skybox.vert",      "Shaders/skybox.frag");
     Shader irradianceShader ("Shaders/irradiance.vert",  "Shaders/irradiance.frag");
 
@@ -211,9 +211,9 @@ int main()
     float roughness  = 1.0f;
     float ambOcc     = 1.0f;
 
-    float lightPos[3]    = { -0.8f, 200.0f, -0.3f };
-    float lightCol[3]    = { 30.0f,  30.0f,  30.0f };
-    float lightIntensity = 300.0f;
+    float lightDir[2]    = { -5.0f, 5.0f };
+    float lightCol[3]    = { 1.0f,  1.0f,  1.0f };
+    float lightIntensity = 1.0f;
     float envLightStr    = 0.1f;
 
     // Point light shadow depth range — tune farPlane to match your world scale
@@ -241,19 +241,19 @@ int main()
         glm::mat4 proj = camera.Get_Projection_Matrix(aspect);
 
         // ------------- point-light cubemap matrices -------------
-        glm::vec3 lightPosV = glm::vec3(lightPos[0], lightPos[1], lightPos[2]);
+        glm::vec3 lightDirV = glm::vec3(lightDir[0], -1.0f, lightDir[1]);
 
         // 90° FOV + 1:1 aspect so each face covers exactly one cube quadrant
-        glm::mat4 lightProj = glm::perspective(glm::radians(90.0f), 1.0f, nearPlane, farPlane);
+        // glm::mat4 lightProj = glm::perspective(glm::radians(90.0f), 1.0f, nearPlane, farPlane);
 
-        std::vector<glm::mat4> lightSpaceMatrices = {
-            lightProj * glm::lookAt(lightPosV, lightPosV + glm::vec3( 1, 0, 0), glm::vec3(0,-1, 0)),
-            lightProj * glm::lookAt(lightPosV, lightPosV + glm::vec3(-1, 0, 0), glm::vec3(0,-1, 0)),
-            lightProj * glm::lookAt(lightPosV, lightPosV + glm::vec3( 0, 1, 0), glm::vec3(0, 0, 1)),
-            lightProj * glm::lookAt(lightPosV, lightPosV + glm::vec3( 0,-1, 0), glm::vec3(0, 0,-1)),
-            lightProj * glm::lookAt(lightPosV, lightPosV + glm::vec3( 0, 0, 1), glm::vec3(0,-1, 0)),
-            lightProj * glm::lookAt(lightPosV, lightPosV + glm::vec3( 0, 0,-1), glm::vec3(0,-1, 0)),
-        };
+        // std::vector<glm::mat4> lightSpaceMatrices = {
+        //     lightProj * glm::lookAt(lightPosV, lightPosV + glm::vec3( 1, 0, 0), glm::vec3(0,-1, 0)),
+        //     lightProj * glm::lookAt(lightPosV, lightPosV + glm::vec3(-1, 0, 0), glm::vec3(0,-1, 0)),
+        //     lightProj * glm::lookAt(lightPosV, lightPosV + glm::vec3( 0, 1, 0), glm::vec3(0, 0, 1)),
+        //     lightProj * glm::lookAt(lightPosV, lightPosV + glm::vec3( 0,-1, 0), glm::vec3(0, 0,-1)),
+        //     lightProj * glm::lookAt(lightPosV, lightPosV + glm::vec3( 0, 0, 1), glm::vec3(0,-1, 0)),
+        //     lightProj * glm::lookAt(lightPosV, lightPosV + glm::vec3( 0, 0,-1), glm::vec3(0,-1, 0)),
+        // };
 
         // Pre passes
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
@@ -262,24 +262,24 @@ int main()
         // =====================================================================
         // PASS 1 — Depth / shadow cubemap  (geometry shader fans to all 6 faces)
         // =====================================================================
-        simpleDepthShader.Use();
-        for (int i = 0; i < 6; ++i)
-            simpleDepthShader.SetMat4("_LightSpaceMatrices[" + std::to_string(i) + "]", lightSpaceMatrices[i]);
+        // simpleDepthShader.Use();
+        // for (int i = 0; i < 6; ++i)
+        //     simpleDepthShader.SetMat4("_LightSpaceMatrices[" + std::to_string(i) + "]", lightSpaceMatrices[i]);
 
-        // Needed by the frag shader to write normalised linear depth
-        simpleDepthShader.SetVec3 ("_LightPos",  lightPosV);
-        simpleDepthShader.SetFloat("_FarPlane",  farPlane);
+        // // Needed by the frag shader to write normalised linear depth
+        // simpleDepthShader.SetVec3 ("_LightPos",  lightPosV);
+        // simpleDepthShader.SetFloat("_FarPlane",  farPlane);
 
-        glViewport(0, 0, SHADOW_MAP_RES, SHADOW_MAP_RES);
-        glBindFramebuffer(GL_FRAMEBUFFER, shadowMap.depthMapFBO);
-            glClear(GL_DEPTH_BUFFER_BIT);
-            // view/proj are unused in the depth pass — geometry shader owns the transform
-            RenderScene(simpleDepthShader, noiseCalcComp, terrain, camera,
-                        glm::mat4(1.0f), glm::mat4(1.0f), /*depthPassOnly=*/true);
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        // glViewport(0, 0, SHADOW_MAP_RES, SHADOW_MAP_RES);
+        // glBindFramebuffer(GL_FRAMEBUFFER, shadowMap.depthMapFBO);
+        //     glClear(GL_DEPTH_BUFFER_BIT);
+        //     // view/proj are unused in the depth pass — geometry shader owns the transform
+        //     RenderScene(simpleDepthShader, noiseCalcComp, terrain, camera,
+        //                 glm::mat4(1.0f), glm::mat4(1.0f), /*depthPassOnly=*/true);
+        // glBindFramebuffer(GL_FRAMEBUFFER, 0);
         
-        glViewport(0, 0, w, h);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        // glViewport(0, 0, w, h);
+        // glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         
         // =====================================================================
@@ -290,7 +290,7 @@ int main()
         terrainShader.SetFloat("_Metallic",  metallic);
         terrainShader.SetFloat("_Roughness", roughness);
         terrainShader.SetFloat("_AO",        ambOcc);
-        terrainShader.SetVec3 ("_LightPos",  lightPosV);
+        terrainShader.SetVec3 ("_LightDir",  lightDirV);
         terrainShader.SetVec3 ("_LightCol",  glm::vec3(lightCol[0], lightCol[1], lightCol[2]));
         terrainShader.SetFloat("_LightIntensity",           lightIntensity);
         terrainShader.SetFloat("_EnvironmentLightStrength", envLightStr);
@@ -352,9 +352,9 @@ int main()
         ImGui::SliderFloat ("Metallic",                &metallic,       0.0f, 1.0f);
         ImGui::SliderFloat ("Roughness",               &roughness,      0.0f, 1.0f);
         ImGui::SliderFloat ("Ambient Occlusion",       &ambOcc,         0.0f, 1.0f);
-        ImGui::SliderFloat3("Light Position",           lightPos,     -200.0f, 200.0f);
+        ImGui::SliderFloat2("Light Direction",         lightDir,     -40.0f, 40.0f);
         ImGui::ColorEdit3  ("Light Colour",             lightCol);
-        ImGui::SliderFloat ("Light Intensity",         &lightIntensity, 0.0f, 500.0f);
+        ImGui::SliderFloat ("Light Intensity",         &lightIntensity, 0.01f, 1.0f);
         ImGui::SliderFloat ("Environment Light Intensity", &envLightStr, 0.0f, 10.0f);
 
         ImGui::Separator();

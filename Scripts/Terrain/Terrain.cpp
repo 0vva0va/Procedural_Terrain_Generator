@@ -22,7 +22,7 @@ Terrain::~Terrain()
 // ------------- generate simple flat mesh -------------
 void Terrain::Generate_Mesh() 
 {
-    unsigned int resolution = size;
+    unsigned int resolution = size * 2;
     const unsigned int vertCountPerSide = resolution + 1;
 
     const float halfSize = size * 0.5f;
@@ -109,7 +109,7 @@ void Terrain::Upload_To_GPU()
 
 void Terrain::SetupNoiseSSBO()
 {
-    int vertCount = (size + 1) * (size + 1);
+    int vertCount = (size * 2 + 1) * (size * 2 + 1);
     glGenBuffers(1, &terrainHeightSSBO);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, terrainHeightSSBO);
     glBufferData(GL_SHADER_STORAGE_BUFFER, vertCount * sizeof(float), nullptr, GL_DYNAMIC_DRAW);

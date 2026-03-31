@@ -8,9 +8,6 @@ uniform mat4 _MVP;
 uniform mat4 _Model;
 uniform int  _TerrainWidth;
 
-// _LightSpaceMatrix removed — point light shadows are sampled via world-pos
-// direction into a samplerCube, so no light-space transform is needed here.
-
 
 // ---- terrain params -----
 layout(std430, binding = 0) buffer TerrainHeightData { float height[];  };
@@ -19,8 +16,7 @@ layout(std430, binding = 1) buffer TerrainNormalData { vec4  normals[]; };
 
 out vec3  FS_Normal;
 out vec3  FS_WorldPos;
-// FS_LightSpace removed — fragment shader computes (FS_WorldPos - _LightPos)
-// and passes that direction straight to texture(_ShadowMap, dir).
+
 
 
 void main() {
