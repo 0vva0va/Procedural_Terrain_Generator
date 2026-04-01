@@ -19,11 +19,17 @@ uniform float _EnvironmentLightStrength;
 uniform float _FogDensity;
 
 float _FarPlane = 1000.0f;  
+uniform mat4 _View;
 
 uniform vec3 _CamPos;
 
 uniform samplerCube _IrradianceMap;  // unit 1
-uniform samplerCube _ShadowMap;      // unit 2
+uniform sampler2DArray _ShadowMap;   // unit 2
+
+layout (std140) uniform LightSpaceMatrices { mat4 lightSpaceMatrices[16]; };
+uniform float cascadePlaneDistances[16];
+uniform int   cascadeCount;   // number of frusta - 1
+
 
 out vec4 FragColor;
 
@@ -31,9 +37,9 @@ out vec4 FragColor;
 const float PI = 3.14159265359;
 
 
-// ---------------------------------------------------------------------------
+
 // Fog
-// ---------------------------------------------------------------------------
+// -----------------------------------------------
 vec3 ApplyFog(vec3 col, float t)
 {
     float fogAmount = 1.0 - exp(-t * _FogDensity);
@@ -42,50 +48,66 @@ vec3 ApplyFog(vec3 col, float t)
 }
 
 
+// Cascade Shadow Map
 // ---------------------------------------------------------------------------
-// Point-light PCF shadow
-//   Samples the depth cubemap in a small neighbourhood of directions and
-//   averages the results for a soft penumbra.
-// ---------------------------------------------------------------------------
-// float PointShadow(vec3 fragWorldPos)
-// {
-//     vec3  fragToLight  = fragWorldPos - _LightPos;
-//     float currentDepth = length(fragToLight);
-    
-//     vec3  L      = normalize(-fragToLight);
-//     float NdotL  = max(dot(normalize(FS_Normal), L), 0.0);
-//     float bias   = mix(8.0, 0.5, NdotL);  
-//     bias        *= (currentDepth / _FarPlane);  
-//     bias         = max(bias, 0.1);           
+float SampleShadow(vec3 fragPosWorldSpace, int layer)
+{
+    vec4  fragPosLightSpace = lightSpaceMatrices[layer] * vec4(fragPosWorldSpace, 1.0);
+    vec3  projCoords        = fragPosLightSpace.xyz / fragPosLightSpace.w;
+    projCoords = projCoords * 0.5 + 0.5;
 
-//     vec3 sampleOffsets[20] = vec3[](
-//         vec3( 1,  1,  1), vec3( 1, -1,  1), vec3(-1, -1,  1), vec3(-1,  1,  1),
-//         vec3( 1,  1, -1), vec3( 1, -1, -1), vec3(-1, -1, -1), vec3(-1,  1, -1),
-//         vec3( 1,  1,  0), vec3( 1, -1,  0), vec3(-1, -1,  0), vec3(-1,  1,  0),
-//         vec3( 1,  0,  1), vec3(-1,  0,  1), vec3( 1,  0, -1), vec3(-1,  0, -1),
-//         vec3( 0,  1,  1), vec3( 0, -1,  1), vec3( 0, -1, -1), vec3( 0,  1, -1)
-//     );
+    float currentDepth = projCoords.z;
+    if (currentDepth > 1.0) return 0.0;
 
-//     float viewDist   = length(_CamPos - fragWorldPos);
-//     float diskRadius = mix(0.05, 0.3, viewDist / _FarPlane);
-    
-//     // Rotate PCF disc by a per-fragment angle
-//     float angle = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453) * 2.0 * PI;
-//     mat2 rot = mat2(cos(angle), -sin(angle), sin(angle), cos(angle));
+    vec3  normal = normalize(FS_Normal);
+    float bias   = max(0.05 * (1.0 - dot(normal, _LightDir)), 0.005);
+    bias *= 1.0 / ((layer == cascadeCount ? _FarPlane : cascadePlaneDistances[layer]) * 0.5);
 
-//     float shadow = 0.0;
-//     for (int i = 0; i < 20; ++i)
-//     {
-//         vec3 offset = vec3(sampleOffsets[i].xy * rot, sampleOffsets[i].z);
-//         float closestDepth = texture(_ShadowMap, fragToLight + offset * diskRadius).r;
-//         closestDepth *= _FarPlane;
+    float shadow    = 0.0;
+    vec2  texelSize = 1.0 / vec2(textureSize(_ShadowMap, 0));
+    for (int x = -1; x <= 1; ++x)
+    for (int y = -1; y <= 1; ++y)
+    {
+        float pcfDepth = texture(_ShadowMap, vec3(projCoords.xy + vec2(x,y) * texelSize, layer)).r;
+        shadow += (currentDepth - bias) > pcfDepth ? 1.0 : 0.0;
+    }
+    return shadow / 9.0;
+}
 
-//         if (currentDepth - bias > closestDepth)
-//             shadow += 1.0;
-//     }
-//     float shadowFade = 1.0 - smoothstep(0.7 * _FarPlane, _FarPlane, currentDepth);
-//     return (shadow / 20.0) * shadowFade;
-// }
+float ShadowCalculation(vec3 fragPosWorldSpace)
+{
+    vec4  fragPosViewSpace = _View * vec4(fragPosWorldSpace, 1.0);
+    float depthValue       = abs(fragPosViewSpace.z);
+
+    int layer = cascadeCount; // default to last
+    for (int i = 0; i < cascadeCount; ++i)
+    {
+        if (depthValue < cascadePlaneDistances[i])
+        {
+            layer = i;
+            break;
+        }
+    }
+
+    // --- sample primary layer ---
+    float shadow = SampleShadow(fragPosWorldSpace, layer);
+
+    // --- blend into next layer near the boundary ---
+    const float blendRange = 0.1; // 10% of cascade depth blends into next
+    float cascadeNear = (layer == 0) ? 0.0 : cascadePlaneDistances[layer - 1];
+    float cascadeFar  = (layer == cascadeCount) ? _FarPlane : cascadePlaneDistances[layer];
+    float cascadeLen  = cascadeFar - cascadeNear;
+    float blendStart  = cascadeFar - cascadeLen * blendRange;
+
+    if (depthValue > blendStart && layer + 1 <= cascadeCount)
+    {
+        float nextShadow = SampleShadow(fragPosWorldSpace, layer + 1);
+        float t = (depthValue - blendStart) / (cascadeLen * blendRange);
+        shadow = mix(shadow, nextShadow, t);
+    }
+
+    return shadow;
+}
 
 
 // ---------------------------------------------------------------------------
@@ -155,8 +177,8 @@ void main()
     vec3 F0 = mix(vec3(0.04), _Albedo, _Metallic);
            
     // ---- direct lighting (single point light) ----
-    vec3  L           = normalize(-_LightDir);
-    vec3  H           = normalize(V + L);
+    vec3  L           = -normalize(_LightDir);
+    vec3  H           =  normalize(V + L);
     // float dist        = length(_LightPos - FS_WorldPos);
     // float attenuation = 1.0 / (dist * dist);
     // vec3  radiance    = _LightCol * attenuation * _LightIntensity;
@@ -190,11 +212,9 @@ void main()
     vec3 ambient = (kD_amb * diffuse) * _AO;
          
     // ---- shadow ----
-    //float shadow = PointShadow(FS_WorldPos);   
-    
-    //ambient *= (1.0 - shadow * 0.2);
+    float shadow = ShadowCalculation(FS_WorldPos);     
 
-    vec3 color = ambient + Lo; //* (1.0 - shadow);
+    vec3 color = ambient + (1.0 - shadow) * Lo;
          color = ApplyFog(color, length(_CamPos - FS_WorldPos));
          
          color = ACESFilm(color);

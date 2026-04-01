@@ -78,18 +78,10 @@ void MouseButtonCallback(GLFWwindow* window, int button, int action, int)
 //   depthPassOnly — when true, skips uniforms that are irrelevant for a depth-only
 //   render (PBR, IBL, fog…)
 // -------------------------------------------------------------------------------------
-void RenderScene(
-    Shader&            shader,
-    ComputeShader&     noiseComp,
-    Terrain&           terrain,
-    const Camera&      camera,
-    const glm::mat4&   view,
-    const glm::mat4&   proj,
-    bool               depthPassOnly = false)
+void ComputeNoiseDispatch(Terrain& terrain, ComputeShader& noiseComp)
 {
-    glm::mat4 model = glm::mat4(1.0f);
     const TerrainParams& p = terrain.GetParams();
-
+    
     // ------------- noise compute -------------
     noiseComp.Use();
     terrain.BindSSBOBuffers();
@@ -105,6 +97,19 @@ void RenderScene(
 
     glDispatchCompute(threadsX, threadsY, 1);
     glMemoryBarrier(GL_ALL_BARRIER_BITS);
+}
+
+
+void RenderScene(
+    Shader&            shader,
+    Terrain&           terrain,
+    const Camera&      camera,
+    const glm::mat4&   view,
+    const glm::mat4&   proj,
+    bool               depthPassOnly = false)
+{
+    glm::mat4 model = glm::mat4(1.0f);
+    const TerrainParams& p = terrain.GetParams();
 
     // ------------- draw terrain -------------
     shader.Use();
@@ -183,11 +188,10 @@ int main()
 
     Skybox skybox;
     skybox.BakeIrradiance(irradianceShader);
-
-
+    
+    
     // ------------- shadow map framebuffer -------------
     ShadowMap shadowMap;
-
     glViewport(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
 
 
@@ -220,7 +224,7 @@ int main()
     const float nearPlane = 0.1f;
     const float farPlane  = 1000.0f;
 
-
+    ComputeNoiseDispatch(terrain, noiseCalcComp);
     // ------------------------------------------
     // ------------- GLFW MAIN LOOP -------------
     while (!glfwWindowShouldClose(window))
@@ -240,46 +244,43 @@ int main()
         glm::mat4 view = camera.Get_View_Matrix();
         glm::mat4 proj = camera.Get_Projection_Matrix(aspect);
 
-        // ------------- point-light cubemap matrices -------------
+        // --------------------------
         glm::vec3 lightDirV = glm::vec3(lightDir[0], -1.0f, lightDir[1]);
 
-        // 90° FOV + 1:1 aspect so each face covers exactly one cube quadrant
-        // glm::mat4 lightProj = glm::perspective(glm::radians(90.0f), 1.0f, nearPlane, farPlane);
+        shadowMap.cam = camera;
+        shadowMap.lightDir = lightDirV;
+        shadowMap.camNearPlane = nearPlane;
+        shadowMap.camFarPlane  = farPlane;
+        shadowMap.fbHeight = h;
+        shadowMap.fbWidth  = w;
 
-        // std::vector<glm::mat4> lightSpaceMatrices = {
-        //     lightProj * glm::lookAt(lightPosV, lightPosV + glm::vec3( 1, 0, 0), glm::vec3(0,-1, 0)),
-        //     lightProj * glm::lookAt(lightPosV, lightPosV + glm::vec3(-1, 0, 0), glm::vec3(0,-1, 0)),
-        //     lightProj * glm::lookAt(lightPosV, lightPosV + glm::vec3( 0, 1, 0), glm::vec3(0, 0, 1)),
-        //     lightProj * glm::lookAt(lightPosV, lightPosV + glm::vec3( 0,-1, 0), glm::vec3(0, 0,-1)),
-        //     lightProj * glm::lookAt(lightPosV, lightPosV + glm::vec3( 0, 0, 1), glm::vec3(0,-1, 0)),
-        //     lightProj * glm::lookAt(lightPosV, lightPosV + glm::vec3( 0, 0,-1), glm::vec3(0,-1, 0)),
-        // };
-
-        // Pre passes
+        // Pre pass
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
                 
-        // =====================================================================
-        // PASS 1 — Depth / shadow cubemap  (geometry shader fans to all 6 faces)
-        // =====================================================================
-        // simpleDepthShader.Use();
-        // for (int i = 0; i < 6; ++i)
-        //     simpleDepthShader.SetMat4("_LightSpaceMatrices[" + std::to_string(i) + "]", lightSpaceMatrices[i]);
-
-        // // Needed by the frag shader to write normalised linear depth
-        // simpleDepthShader.SetVec3 ("_LightPos",  lightPosV);
-        // simpleDepthShader.SetFloat("_FarPlane",  farPlane);
-
-        // glViewport(0, 0, SHADOW_MAP_RES, SHADOW_MAP_RES);
-        // glBindFramebuffer(GL_FRAMEBUFFER, shadowMap.depthMapFBO);
-        //     glClear(GL_DEPTH_BUFFER_BIT);
-        //     // view/proj are unused in the depth pass — geometry shader owns the transform
-        //     RenderScene(simpleDepthShader, noiseCalcComp, terrain, camera,
-        //                 glm::mat4(1.0f), glm::mat4(1.0f), /*depthPassOnly=*/true);
-        // glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        // PASS 1 — Depth / shadow cubemap  
+        // ===============================
+        const auto lightMatrices = shadowMap.GetLightSpaceMatrices();
+        glBindBuffer(GL_UNIFORM_BUFFER, shadowMap.matricesUBO);
+        for (size_t i = 0; i < lightMatrices.size(); ++i)
+        {
+            glBufferSubData(GL_UNIFORM_BUFFER, i * sizeof(glm::mat4x4), sizeof(glm::mat4x4), &lightMatrices[i]);
+        }
+        glBindBuffer(GL_UNIFORM_BUFFER, 0);
         
-        // glViewport(0, 0, w, h);
-        // glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        simpleDepthShader.Use();
+        
+        glBindFramebuffer(GL_FRAMEBUFFER, shadowMap.lightFBO);
+        glViewport(0, 0, shadowMap.DEPTH_MAP_RES, shadowMap.DEPTH_MAP_RES);
+        glClear(GL_DEPTH_BUFFER_BIT);
+        glCullFace(GL_FRONT);  // peter panning
+        RenderScene(simpleDepthShader, terrain, camera, view, proj, /*depthPassOnly=*/true);
+        glCullFace(GL_BACK);
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        
+        // reset viewport
+        glViewport(0, 0, w, h);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         
         // =====================================================================
@@ -294,19 +295,23 @@ int main()
         terrainShader.SetVec3 ("_LightCol",  glm::vec3(lightCol[0], lightCol[1], lightCol[2]));
         terrainShader.SetFloat("_LightIntensity",           lightIntensity);
         terrainShader.SetFloat("_EnvironmentLightStrength", envLightStr);
-        // Point-light shadow: pass farPlane so the frag shader can un-normalise the stored depth
-        terrainShader.SetFloat("_FarPlane",      farPlane);
-        terrainShader.SetInt  ("_ShadowMap",     2);   // texture unit 2  (samplerCube)
+        terrainShader.SetFloat("_FarPlane", farPlane);
         terrainShader.SetInt  ("_IrradianceMap", 1);   // texture unit 1
+        
+        terrainShader.SetMat4("_View", view);
+        terrainShader.SetInt  ("_ShadowMap",     2);   // texture unit 2
+        terrainShader.SetInt("cascadeCount", shadowMap.shadowCascadeLevels.size());
+        for (size_t i = 0; i < shadowMap.shadowCascadeLevels.size(); ++i)
+        {
+            terrainShader.SetFloat("cascadePlaneDistances[" + std::to_string(i) + "]", shadowMap.shadowCascadeLevels[i]);
+        }
 
         glActiveTexture(GL_TEXTURE1);
         glBindTexture(GL_TEXTURE_CUBE_MAP, skybox.GetIrradianceMap());
-
-        // Bind the depth cubemap — fragment shader samples it with samplerCube
         glActiveTexture(GL_TEXTURE2);
-        glBindTexture(GL_TEXTURE_CUBE_MAP, shadowMap.depthMap);
+        glBindTexture(GL_TEXTURE_2D_ARRAY, shadowMap.lightDepthMap);
 
-        RenderScene(terrainShader, noiseCalcComp, terrain, camera, view, proj, /*depthPassOnly=*/false);
+        RenderScene(terrainShader, terrain, camera, view, proj, /*depthPassOnly=*/false);
 
         // Skybox
         glDepthFunc(GL_LEQUAL);
@@ -343,7 +348,12 @@ int main()
         changed |= ImGui::InputInt   ("Seed",            &uiParams.seed);
         changed |= ImGui::SliderFloat("Fog Density",     &uiParams.fogDensity, 0.00001f, 0.005f);
 
-        if (changed) terrain.SetParams(uiParams);
+        if (changed) 
+        {
+            terrain.SetParams(uiParams);
+            ComputeNoiseDispatch(terrain, noiseCalcComp);
+        }
+        
 
         ImGui::Separator();
 
