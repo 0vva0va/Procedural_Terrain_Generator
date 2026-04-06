@@ -151,3 +151,8 @@ std::vector<glm::mat4> ShadowMap::GetLightSpaceMatrices()
     }
     return ret;
 }
+
+
+GLuint ShadowMap::GetLightDepthMap() const { return lightDepthMap; }
+GLuint ShadowMap::GetLightFBO()      const { return lightFBO;      }
+GLuint ShadowMap::GetMatricesUBO()   const { return matricesUBO;   }

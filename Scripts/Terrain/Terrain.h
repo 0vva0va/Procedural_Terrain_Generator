@@ -16,7 +16,6 @@ struct TerrainParams
     float persistence = 0.5f;
     float hydro       = 0.5f;
     float thermal     = 0.5f;
-    float fogDensity  = 0.0005f;
 };
 
 

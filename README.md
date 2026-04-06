@@ -1,48 +1,48 @@
 # Procedural Terrain Generator 🌄
 
-A small experimental application for generating and displaying procedural terrain using OpenGL, GLFW and ImGui.  
-Parts of the renderer, GUI and noise algorithms are under active development – consider this a work‑in‑progress.
+A small experimental application for generating and rendering procedural terrain with OpenGL, GLFW and ImGui.
+This project explores noise-based terrain synthesis, dynamic lighting, and real-time effect passes.  
+⚠️ **WIP:** ongoing work, API and architecture are subject to change.
 
 ## Features
 
-- OpenGL-based terrain rendering  
-- ImGui interface for tweaking parameters  
-- GLSL shaders for tessellation / displacement  
-- GLFW window/input handling  
-- Modular code in `renderer/`, `terrain/`, `shaders/` etc.
+- OpenGL-based real-time procedural terrain mesh rendering
+- ImGui parameter panel for noise, shading, fog, shadows, and camera
+- Depth+shadow pass, normal mapping, and full-screen compositing in GLSL
+- Fractal Brownian Motion (FBM) noise stack for multi-octave terrain detail
+- Modular script-based architecture in `Scripts/` and `Shaders/`
+- Included external libraries: GLAD, GLFW, GLM, ImGui, stb_image
 
-## Build & Run
+## Project layout
 
-1. **Dependencies:**  
-   - C++ compiler with C++17 support  
-   - `glfw3`, OpenGL headers (bundled under `include/`)  
-   - Make (project uses `Makefile` on Windows/Unix)
+- `PTGen.cpp` : main entry point
+- `Include/Camera.*` : camera controls and view matrices
+- `Scripts/` : core features by subsystem
+  - `CascadeShadows/` : shadow map generation and cascade logic
+  - `Skybox/` : skybox rendering
+  - `Terrain/` : terrain mesh generation and rendering
+- `Shaders/` : GLSL source files and compute shaders
+- `External/External/` : vendor libraries (glad, imgui, GLFW headers, glm)
+- `build/` : generated object files and dependency graphs
 
-2. **Compile:**
-   ```sh
-   make
-   ```
+## Prerequisites
 
-3. **Launch:**
-   ```sh
-   ./ptg
-   ```
+- C++ toolchain with C++17/20 support
+- `make` utility (MinGW/WSL on Windows or native on Linux/macOS)
+- Graphics drivers supporting OpenGL 3.3+
 
-   (On Windows the executable is `ptg.exe`.)
+## Configuration
 
-## Structure
-
-```
-├── ptg.cpp            # entry point
-├── renderer/          # rendering utilities & camera
-├── terrain/           # terrain generation logic
-├── shaders/           # GLSL programs
-├── include/           # third-party libs (glad, GLFW, glm)
-├── backends/          # ImGui GLFW/OpenGL backends
-```
+- Shader source directory: `Shaders/`
+- Output executable: `PTGen` / `PTGen.exe`
 
 ## Status
 
-⚠️ **WIP:** many systems are incomplete, APIs may change, and the code may be reorganized. Idk if some of this stuff even works.
+⚠️ **WIP:** core systems are functional but still evolving. Some behavior may be incomplete (fog, FBM quality, performance tuning).
+
+## References
+
+- Fog implementation: [Inigo Quilez article on better fog](https://iquilezles.org/articles/fog/)
+- FBM noise implementation: [Inigo Quilez article on noise derivatives](https://iquilezles.org/articles/morenoise/)
 
 ---

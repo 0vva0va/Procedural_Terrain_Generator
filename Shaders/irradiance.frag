@@ -1,6 +1,6 @@
 #version 450 core
 
-in vec3 localPos;
+in vec3 worldPos;
 
 uniform samplerCube environmentMap;
 
@@ -10,7 +10,7 @@ const float PI = 3.14159265359;
 
 void main()
 {
-    vec3 N = normalize(localPos);
+    vec3 N = normalize(worldPos);
 
     // Build a TBN frame around N
     vec3 up    = vec3(0.0, 1.0, 0.0);
