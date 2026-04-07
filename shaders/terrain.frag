@@ -58,146 +58,13 @@ const float PI = 3.14159265359;
 
 
 // Fog
-// -----------------------------------------------
-vec3 ApplyFog(vec3 col, float t, vec3 viewDir, vec3 lightDir)
-{
-    float fogAmount = 1.0 - exp(-t * _FogDensity);
-    float sunAmount = max(dot(viewDir, lightDir), 0.0);
-    vec3  fogColor  = mix(vec3(0.5,0.6,0.7), // blue
-                          vec3(1.0,0.9,0.7), // yellow
-                          pow(sunAmount,8.0));
-    return mix(col, fogColor, fogAmount);
-}
-
-vec3 ApplyFogSplit(vec3 col, float t)
-{
-    vec3 be = vec3(0.05, 0.02, 0.01)* 0.05; // Red dies fast, blue survives far
-    vec3 bi = vec3(0.01, 0.03, 0.08)* 0.05; // Blue fog dominates
-    vec3 fogColor = vec3(0.2,0.3,0.4);
-    vec3 extColor = vec3(exp(-t * be.x), 
-                        exp(-t * be.y), 
-                        exp(-t * be.z));
-    vec3 insColor = vec3(1.0 -exp(-t * bi.x), 
-    1.0 -exp(-t * bi.y), 
-    1.0 -exp(-t * bi.z));
-    
-    // Combine: surviving original color + accumulated fog color
-    vec3 finalColor = col * extColor + fogColor * insColor;
-    return finalColor;
-}
-
-vec3 ApplyFogHeight(vec3 col, float distance, float fragHeight)
-{
-    if (fragHeight > 10.0) return col;
-    
-    float fogAmount  = 1.0 - exp(-distance * _FogDensity);
-          fogAmount *= 1.0 - smoothstep(0.0, 10.0, fragHeight);
-    
-    return mix(col, vec3(0.5,0.6,0.7), clamp(fogAmount, 0.0, 1.0));
-}
-
-vec3 ApplyFogUltimate(
-    vec3  col,           // Original pixel color
-    float distance,      // Distance from camera to fragment
-    float fragHeight,    // World-space Y of fragment
-    vec3  viewDir,       // Normalized view direction
-    vec3  lightDir       // Normalized sun/light direction
-) {
-    // --- PARAMETERS (make these uniforms) ---
-    float fogHeightMin  = 0.0;      // Fog starts at this height
-    float fogHeightMax  = 10.0;     // Fog ends at this height  
-    float densityScale  = _FogDensity; // Overall density multiplier
-    
-    // Spectral scattering coefficients (RGB = different wavelengths)
-    vec3  be = vec3(0.25, 0.10, 0.05) * densityScale; // Extinction: red dies fast
-    vec3  bi = vec3(0.05, 0.15, 0.40) * densityScale; // Inscattering: blue dominates
-    
-    vec3  fogColorBase  = vec3(0.2, 0.3, 0.4);  // Ambient fog color
-    vec3  fogColorSun   = vec3(1.0, 0.9, 0.7);  // Sun-facing fog color
-    float sunPower      = 8.0;                  // Sun glow tightness
-    
-    // --- HEIGHT ATTENUATION ---
-    // Smooth height falloff: 1.0 inside fog, 0.0 above fogHeightMax
-    float heightFactor = 1.0 - smoothstep(fogHeightMin, fogHeightMax, fragHeight);
-    if (heightFactor <= 0.0) return col; // Early exit if above fog
-    
-    // Effective optical distance through fog layer
-    float opticalDepth = distance * heightFactor;
-    
-    // --- SPECTRAL ATMOSPHERIC SCATTERING ---
-    // Transmittance: how much original light survives per channel
-    vec3 transmittance = vec3(
-        exp(-opticalDepth * be.x),
-        exp(-opticalDepth * be.y),
-        exp(-opticalDepth * be.z)
-    );
-    
-    // Extinction factor: how much original color is lost
-    vec3 extinction = 1.0 - transmittance;
-    
-    // Inscattering factor: how much fog color is added per channel  
-    vec3 inscatter = vec3(
-        1.0 - exp(-opticalDepth * bi.x),
-        1.0 - exp(-opticalDepth * bi.y),
-        1.0 - exp(-opticalDepth * bi.z)
-    );
-    
-    // --- DIRECTIONAL LIGHT INSCATTERING ---
-    // Sun glow when looking toward light
-    float sunDot = max(dot(viewDir, lightDir), 0.0);
-    float sunFactor = pow(sunDot, sunPower);
-    
-    // Blend base fog color toward sun color based on view angle
-    vec3 fogColor = mix(fogColorBase, fogColorSun, sunFactor);
-    
-    // --- FINAL COMPOSITION ---
-    // Extinction removes original color, inscattering adds fog color
-    vec3 finalColor = col * transmittance + fogColor * inscatter;
-    
-    return finalColor;
-}
-
-float hash(vec3 p) {
-    p = vec3(dot(p, vec3(127.1, 311.7, 74.7)),
-             dot(p, vec3(269.5, 183.3, 246.1)),
-             dot(p, vec3(113.5, 271.9, 124.6)));
-    return fract(sin(p.x + p.y + p.z) * 43758.5453);
-}
-
-// Smooth 3D noise
-float noise(vec3 x) {
-    vec3 p = floor(x);
-    vec3 f = fract(x);
-    f = f * f * (3.0 - 2.0 * f); // Smoothstep
-    
-    float n = mix(
-        mix(mix(hash(p + vec3(0,0,0)), hash(p + vec3(1,0,0)), f.x),
-            mix(hash(p + vec3(0,1,0)), hash(p + vec3(1,1,0)), f.x), f.y),
-        mix(mix(hash(p + vec3(0,0,1)), hash(p + vec3(1,0,1)), f.x),
-            mix(hash(p + vec3(0,1,1)), hash(p + vec3(1,1,1)), f.x), f.y),
-        f.z
-    );
-    return n;
-}
-
-// FBM for wispy detail - 4 octaves
-float fbm(vec3 p) {
-    float value = 0.0;
-    float amplitude = 0.5;
-    float frequency = 1.0;
-    for (int i = 0; i < 4; i++) {
-        value += amplitude * noise(p * frequency);
-        amplitude *= 0.5;
-        frequency *= 2.0;
-    }
-    return value;
-}
-vec3 ApplyFogUltimateTimeDensity(
+// ----
+vec3 ApplyFog(
     vec3  col,           
     float distance,      
     float fragHeight,    
-    vec3  worldPos,      // NEW: World-space position of fragment
-    float time,          // NEW: Time for animation
+    vec3  worldPos,     
+    float time,         
     vec3  viewDir,       
     vec3  lightDir       
 ) {
@@ -223,42 +90,30 @@ vec3 ApplyFogUltimateTimeDensity(
     if (heightFactor <= 0.0) return col; 
     
     // --- NON-CONSTANT DENSITY (WISPY FOG) ---
-    // Animate noise by scrolling in wind direction (e.g., along XZ plane)
     vec3 noisePos = worldPos * wispScale + vec3(time * wispSpeed, 0.0, time * wispSpeed * 0.5);
     
-    // Sample FBM noise: range roughly 0..1, centered around 0.5
     float densityNoise = fbm(noisePos);
+    float densityMod   = mix(1.0 - wispStrength, 1.0, densityNoise);
     
-    // Option A: Modulate heightFactor for "holes" in fog (erosion)
-    // heightFactor *= smoothstep(0.0, 0.4, densityNoise); 
-    
-    // Option B: Modulate density directly (recommended)
-    // Remap noise from [0,1] to [1-wispStrength, 1+wispStrength] or [0, 1]
-    float densityMod = mix(1.0 - wispStrength, 1.0, densityNoise);
-    
-    // Add vertical variation: fog often stratifies into layers
     float verticalWisp = sin(worldPos.y * wispScale * wispHeightAtt + time * 0.1) * 0.5 + 0.5;
-    densityMod *= mix(0.7, 1.3, verticalWisp); // 30% variation by height
+    
+    densityMod *= mix(0.7, 1.3, verticalWisp);
     
     // --- OPTICAL DEPTH WITH VARIABLE DENSITY ---
-    // Approximation: density at fragment * distance through fog layer
     float opticalDepth = distance * heightFactor * densityMod;
     
     // --- SPECTRAL SCATTERING ---
     vec3 transmittance = exp(-opticalDepth * be);
-    vec3 extinction = 1.0 - transmittance;
-    vec3 inscatter = 1.0 - exp(-opticalDepth * bi);
+    vec3 extinction    = 1.0 - transmittance;
+    vec3 inscatter     = 1.0 - exp(-opticalDepth * bi);
     
     // --- DIRECTIONAL LIGHT INSCATTERING ---
-    float sunDot = max(dot(viewDir, lightDir), 0.0);
+    float sunDot    = max(dot(viewDir, lightDir), 0.0);
     float sunFactor = pow(sunDot, sunPower);
     
-    // Optional: Make sun glow "break through" dense wisps (light shafts)
-    // Reduce inscatter in dense areas when looking toward light for god-rays
     float lightShaft = pow(densityNoise, 2.0) * sunFactor * 2.0;
-    vec3 fogColor = mix(fogColorBase, fogColorSun, sunFactor + lightShaft);
+    vec3 fogColor    = mix(fogColorBase, fogColorSun, sunFactor + lightShaft);
     
-    // --- FINAL COMPOSITION ---
     vec3 finalColor = col * transmittance + fogColor * inscatter;
     
     return finalColor;
@@ -370,9 +225,9 @@ vec3 FresnelSchlickRoughness(float cosTheta, vec3 F0, float roughness)
 }
 
 
-// ---------------------------------------------------------------------------
+
 // Tonemapping
-// ---------------------------------------------------------------------------
+// --------------------
 vec3 ACESFilm(vec3 x)
 {
     float a = 2.51;
@@ -385,8 +240,6 @@ vec3 ACESFilm(vec3 x)
 
 
 
-// Main
-// -----------------------------------------------
 void main() 
 {
     vec3 N = normalize(FS_Normal);
@@ -395,7 +248,7 @@ void main()
 
     vec3 F0 = mix(vec3(0.04), _Albedo, _Metallic);
            
-    // ---- direct lighting (single point light) ----
+    // ---- direct lighting ----
     vec3  L = -normalize(_LightDir);
     vec3  H =  normalize(V + L);
     

@@ -6,12 +6,12 @@ This project explores noise-based terrain synthesis, dynamic lighting, and real-
 
 ## Features
 
-- OpenGL-based real-time procedural terrain mesh rendering
 - ImGui parameter panel for noise, shading, fog, shadows, and camera
-- Depth+shadow pass, normal mapping, and full-screen compositing in GLSL
+- Cascade Shadow mapping
+- Full PBR lighting with diffuse + specular IBL
 - Fractal Brownian Motion (FBM) noise stack for multi-octave terrain detail
-- Modular script-based architecture in `Scripts/` and `Shaders/`
-- Included external libraries: GLAD, GLFW, GLM, ImGui, stb_image
+- Powerful & lightweight fog implementation
+
 
 ## Project layout
 

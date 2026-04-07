@@ -311,7 +311,7 @@ int main()
 
         
         // PASS 2 — Full scene
-        // =====================================================================
+        // ===================
         terrainShader.Use();
         terrainShader.SetVec3 ("_Albedo",    glm::vec3(albedo[0], albedo[1], albedo[2]));
         terrainShader.SetFloat("_Metallic",  metallic);
@@ -362,7 +362,7 @@ int main()
         RenderScene(terrainShader, terrain, camera, view, proj, /*depthPassOnly=*/false);
 
         
-        // Skybox
+        // ---- skybox ----
         glDepthFunc(GL_LEQUAL);
             skyboxShader.Use();
             skyboxShader.SetInt ("_Skybox", 0);
